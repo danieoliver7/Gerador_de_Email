@@ -16,6 +16,7 @@ export type ComponentBlock = {
 export type ComponentDefinition = {
   id: string
   name: string
+  kind?: 'button' | 'content'
   marker: string | null
   html: string
   defaults: ComponentOverrides
@@ -104,6 +105,7 @@ export function registerCustomComponent(template: ComponentTemplate): ComponentD
   const anchor = anchorParts(template.html)
   const definition: ComponentDefinition = {
     ...template,
+    kind: template.kind ?? 'button',
     defaults: { text: decodeHtml(anchor.content), url: getHref(anchor.open) },
   }
   definitionsById.set(definition.id, definition)

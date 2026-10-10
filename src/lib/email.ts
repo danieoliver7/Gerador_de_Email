@@ -5,6 +5,9 @@ import { validateConditionBlocks } from './conditions'
 import type { ConditionBoundaryBlock } from './conditions'
 import { restoreHeaderSettings } from './header'
 import type { HeaderSettings } from './header'
+import { partitionInitialMetadata } from './email-metadata'
+import { planEmailSections, sectionComment } from './email-sections'
+import type { EmailSectionName, EmailSectionPlan } from './email-sections'
 
 export type EmailSettings = {
   width: number
@@ -21,6 +24,10 @@ export type RenderedEmail = {
   mjml: string
   html: string
   errors: string[]
+}
+
+export type RenderEmailOptions = {
+  audienceSimulation?: 'member' | 'non-member'
 }
 
 const DEFAULT_COLOR = {
@@ -111,115 +118,72 @@ function renderBlock(block: TextBlock, accentColor: string, compact: boolean): s
 
 type ComponentSlot = { token: string; block: ComponentBlock }
 type ConditionSlot = { token: string; block: ConditionBoundaryBlock }
+type CommentSlot = { token: string; comment: string }
+
+function uniqueSlotToken(kind: string, index: number, documentText: string): string {
+  let suffix = 0
+  let token: string
+  do {
+    token = `__ATELIE_${kind}_SLOT_${index}_${suffix++}__`
+  } while (documentText.includes(token))
+  return token
+}
+
+function renderComment(
+  name: EmailSectionName, edge: 'start' | 'end', slots: CommentSlot[], documentText: string,
+): string {
+  const token = uniqueSlotToken('COMMENT', slots.length, documentText)
+  slots.push({ token, comment: sectionComment(name, edge) })
+  return `<mj-raw>${token}</mj-raw>`
+}
 
 function renderBlocks(
   blocks: ContentBlock[], accentColor: string, compact: boolean,
   slots: ComponentSlot[], conditionSlots: ConditionSlot[], documentText: string,
+  organization?: { plan: EmailSectionPlan; comments: CommentSlot[]; options: RenderEmailOptions },
 ): string {
   const output: string[] = []
+  const starts = new Map(organization?.plan.segments.map((segment) => [segment.start, segment]))
+  const ends = new Map(organization?.plan.segments.map((segment) => [segment.end, segment]))
+  let insideCondition = false
 
   for (let index = 0; index < blocks.length; index += 1) {
     const block = blocks[index]
     if (block.type === 'condition-start' || block.type === 'condition-end') {
-      let suffix = 0
-      let token = ''
-      do {
-        token = `__ATELIE_CONDITION_SLOT_${index}_${suffix}__`
-        suffix += 1
-      } while (documentText.includes(token))
+      insideCondition = block.type === 'condition-start'
+      if (organization?.options.audienceSimulation) continue
+      const token = uniqueSlotToken('CONDITION', conditionSlots.length, documentText)
       conditionSlots.push({ token, block })
       // MJML emits mj-raw between complete table rows, a safe AJO boundary.
       output.push(`<mj-raw>${token}</mj-raw>`)
       continue
     }
+    if (organization?.options.audienceSimulation === 'non-member' && insideCondition) continue
+    const start = starts.get(index)
+    if (start && organization) output.push(renderComment(start.name, 'start', organization.comments, documentText))
     if (block.type === 'component') {
-      let suffix = 0
-      let token = ''
-      do {
-        token = `__ATELIE_COMPONENT_SLOT_${index}_${suffix}__`
-        suffix += 1
-      } while (documentText.includes(token))
+      const token = uniqueSlotToken('COMPONENT', slots.length, documentText)
       slots.push({ token, block })
       output.push(`<mj-text padding="0 0 ${compact ? 8 : 14}px 0">${token}</mj-text>`)
-      continue
-    }
-    if (block.type !== 'list-item') {
+    } else if (block.type !== 'list-item') {
       output.push(renderBlock(block, accentColor, compact))
-      continue
+    } else {
+      const group = [block]
+      while (
+        index + 1 < blocks.length &&
+        blocks[index + 1].type === 'list-item' &&
+        Boolean((blocks[index + 1] as TextBlock).ordered) === Boolean(block.ordered) &&
+        ((blocks[index + 1] as TextBlock).level ?? 0) === (block.level ?? 0)
+      ) {
+        group.push(blocks[++index] as TextBlock)
+      }
+      output.push(renderList(group, accentColor, compact))
     }
-
-    const group = [block]
-    while (
-      index + 1 < blocks.length &&
-      blocks[index + 1].type === 'list-item' &&
-      Boolean((blocks[index + 1] as TextBlock).ordered) === Boolean(block.ordered) &&
-      ((blocks[index + 1] as TextBlock).level ?? 0) === (block.level ?? 0)
-    ) {
-      group.push(blocks[++index] as TextBlock)
-    }
-    output.push(renderList(group, accentColor, compact))
+    const end = ends.get(index + 1)
+    if (end && organization) output.push(renderComment(end.name, 'end', organization.comments, documentText))
   }
 
   return output.join('\n')
-}
-
-const METADATA_LABEL = /^(?:(?:SUB|ASSUNTO)\s*(?::|$)|LINHA\s+FINA\s*(?::|$))/iu
-
-function sliceRuns(runs: InlineNode[], start: number, end: number): InlineNode[] {
-  const sliced: InlineNode[] = []
-  let offset = 0
-  for (const run of runs) {
-    const next = offset + run.text.length
-    if (next > start && offset < end) {
-      const text = run.text.slice(Math.max(0, start - offset), Math.min(run.text.length, end - offset))
-      if (text) sliced.push({ ...run, text })
-    }
-    offset = next
-  }
-  return sliced
-}
-
-/** Finds the first body line without changing any Word text or inline marks. */
-function metadataPrefixInBlock(text: string): { length: number; hasLabel: boolean } {
-  let start = 0
-  let hasLabel = false
-  const inspectLine = (end: number): number | null => {
-    const line = text.slice(start, end).trim()
-    if (METADATA_LABEL.test(line)) hasLabel = true
-    else if (line) return start
-    return null
-  }
-  for (const match of text.matchAll(/\r\n|[\r\n\u2028\u2029]/gu)) {
-    const bodyStart = inspectLine(match.index)
-    if (bodyStart !== null) return { length: bodyStart, hasLabel }
-    start = match.index + match[0].length
-  }
-  const bodyStart = inspectLine(text.length)
-  return { length: bodyStart ?? text.length, hasLabel }
-}
-
-/** Only a leading labelled Word prefix precedes the header, including soft line breaks. */
-function partitionInitialMetadata(blocks: ContentBlock[]): { metadata: ContentBlock[]; body: ContentBlock[] } {
-  const metadata: ContentBlock[] = []
-  let foundLabel = false
-  for (let index = 0; index < blocks.length; index += 1) {
-    const block = blocks[index]
-    if (block.type !== 'paragraph' && block.type !== 'heading') break
-    const text = block.runs.map((run) => run.text).join('')
-    const prefix = metadataPrefixInBlock(text)
-    foundLabel ||= prefix.hasLabel
-    if (prefix.length === 0) break
-    if (prefix.length < text.length) {
-      if (!foundLabel) break
-      metadata.push({ ...block, runs: sliceRuns(block.runs, 0, prefix.length) })
-      const remainder: TextBlock = { ...block, runs: sliceRuns(block.runs, prefix.length, text.length) }
-      return { metadata, body: [remainder, ...blocks.slice(index + 1)] }
-    }
-    metadata.push(block)
-  }
-  return foundLabel
-    ? { metadata, body: blocks.slice(metadata.length) }
-    : { metadata: [], body: blocks }
 }
 
 /** A zero-padded MJML table keeps the empty header at the content area's full width. */
@@ -237,8 +201,8 @@ function renderHeader(header: HeaderSettings, surfaceColor: string): string[] {
   ]
 }
 
-function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings): {
-  mjml: string; slots: ComponentSlot[]; conditionSlots: ConditionSlot[]
+function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings, options: RenderEmailOptions = {}): {
+  mjml: string; slots: ComponentSlot[]; conditionSlots: ConditionSlot[]; commentSlots: CommentSlot[]
 } {
   const width = Number.isFinite(settings.width)
     ? Math.min(800, Math.max(320, Math.round(settings.width)))
@@ -252,7 +216,11 @@ function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings
   const header = restoreHeaderSettings(settings.header)
   const slots: ComponentSlot[] = []
   const conditionSlots: ConditionSlot[] = []
-  const documentText = document.blocks.flatMap((block) => block.runs.map((run) => run.text)).join('')
+  const commentSlots: CommentSlot[] = []
+  const documentText = [
+    ...document.blocks.flatMap((block) => block.runs.flatMap((run) => [run.text, run.href ?? ''])),
+    settings.fontFamily,
+  ].join('')
   const parts = header.enabled
     ? partitionInitialMetadata(document.blocks)
     : { metadata: [], body: document.blocks }
@@ -260,7 +228,10 @@ function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings
   const metadata = hasMetadata
     ? renderBlocks(parts.metadata, accentColor, compact, slots, conditionSlots, documentText)
     : ''
-  const content = renderBlocks(parts.body, accentColor, compact, slots, conditionSlots, documentText)
+  // The complete model determines numbering before any preview visibility filter.
+  const content = renderBlocks(parts.body, accentColor, compact, slots, conditionSlots, documentText, {
+    plan: planEmailSections(parts.body), comments: commentSlots, options,
+  })
 
   // With the header enabled, adjacent sections share the same outer inset. The
   // header column and table have zero padding, so its color reaches both edges.
@@ -273,9 +244,11 @@ function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings
         '      </mj-column>',
         '    </mj-section>',
       ] : []),
+      renderComment('CABEÇALHO', 'start', commentSlots, documentText),
       `    <mj-section padding="${compact ? '0' : hasMetadata ? '0 16px' : '24px 16px 0'}" background-color="${backgroundColor}">`,
       ...renderHeader(header, surfaceColor),
       '    </mj-section>',
+      renderComment('CABEÇALHO', 'end', commentSlots, documentText),
       `    <mj-section padding="${compact ? '0' : '0 16px 24px'}" background-color="${backgroundColor}">`,
       `      <mj-column background-color="${surfaceColor}" padding="${compact ? '14px 18px' : '28px 26px'}">`,
       content,
@@ -300,11 +273,30 @@ function buildMjmlWithSlots(document: ExtractedDocument, settings: EmailSettings
     '  </mj-body>',
     '</mjml>',
   ].join('\n')
-  return { mjml, slots, conditionSlots }
+  return { mjml, slots, conditionSlots, commentSlots }
 }
 
 export function buildMjml(document: ExtractedDocument, settings: EmailSettings): string {
   return buildMjmlWithSlots(document, settings).mjml
+}
+
+/** Replace positions in the compiled output once, never scanning inserted button HTML. */
+function fillCompiledSlots(html: string, replacements: Array<{ token: string; value: string }>): string {
+  const positions = replacements.map(({ token, value }) => {
+    const start = html.indexOf(token)
+    if (start < 0 || html.indexOf(token, start + token.length) >= 0) {
+      throw new Error('Não foi possível posicionar uma seção do email com segurança.')
+    }
+    return { start, end: start + token.length, value }
+  }).sort((left, right) => left.start - right.start)
+  const output: string[] = []
+  let cursor = 0
+  for (const { start, end, value } of positions) {
+    output.push(html.slice(cursor, start), value)
+    cursor = end
+  }
+  output.push(html.slice(cursor))
+  return output.join('')
 }
 
 /** Inserts trusted registered components after MJML compilation so their table HTML is untouched. */
@@ -312,29 +304,28 @@ export async function renderEmail(
   document: ExtractedDocument,
   settings: EmailSettings,
   componentOverrides: Record<string, Partial<ComponentOverrides>> = {},
+  options: RenderEmailOptions = {},
 ): Promise<RenderedEmail> {
   const validationErrors = [...new Set([...(document.errors ?? []), ...validateConditionBlocks(document.blocks)])]
   if (validationErrors.length) return { mjml: '', html: '', errors: validationErrors }
-  const { mjml, slots, conditionSlots } = buildMjmlWithSlots(document, settings)
+  const { mjml, slots, conditionSlots, commentSlots } = buildMjmlWithSlots(document, settings, options)
 
   try {
     const { default: mjml2html } = await import('mjml-browser')
     const result = await mjml2html(mjml, { validationLevel: 'soft' })
-    let html = result.html
-    for (const { token, block } of slots) {
-      if (!html.includes(token)) throw new Error(`Não foi possível posicionar o componente ${block.componentId} no HTML.`)
-      html = html.replace(token, renderCustomComponent(block.componentId, {
-        ...block.initial,
-        ...componentOverrides[block.instanceId],
-      }))
-    }
-    for (const { token, block } of conditionSlots) {
-      if (!html.includes(token)) throw new Error(`Não foi possível posicionar a condição ${block.audience} no HTML.`)
-      const expression = block.type === 'condition-start'
-        ? `{%#if profile.segmentMembership.get("ups").get("${block.audience}").status = "existing"%}`
-        : '{%/if%}'
-      html = html.replace(token, expression)
-    }
+    const html = fillCompiledSlots(result.html, [
+      ...slots.map(({ token, block }) => ({
+        token,
+        value: renderCustomComponent(block.componentId, { ...block.initial, ...componentOverrides[block.instanceId] }),
+      })),
+      ...conditionSlots.map(({ token, block }) => ({
+        token,
+        value: block.type === 'condition-start'
+          ? `{%#if profile.segmentMembership.get("ups").get("${block.audience}").status = "existing"%}`
+          : '{%/if%}',
+      })),
+      ...commentSlots.map(({ token, comment }) => ({ token, value: `\n${comment}\n` })),
+    ])
     return {
       mjml,
       html,

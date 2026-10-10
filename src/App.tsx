@@ -62,15 +62,6 @@ function upgradeDocumentMarkers(value: ExtractedDocument): ExtractedDocument {
   }
 }
 
-function simulatedBlocks(blocks: ContentBlock[], belongsToAudience: boolean): ContentBlock[] {
-  let inside = false
-  return blocks.filter((block) => {
-    if (block.type === 'condition-start') { inside = true; return false }
-    if (block.type === 'condition-end') { inside = false; return false }
-    return belongsToAudience || !inside
-  })
-}
-
 function App() {
   const [settings, setSettings] = useState<EmailSettings>(() => restoredProject?.settings ?? loadSettings())
   const [document, setDocument] = useState<ExtractedDocument | null>(() => restoredProject ? upgradeDocumentMarkers(restoredProject.document) : null)
@@ -153,7 +144,9 @@ function App() {
     setSimulatedResult(null)
     setSimulating(true)
     const timer = window.setTimeout(() => {
-      void renderEmail({ ...document, blocks: simulatedBlocks(document.blocks, belongsToAudience) }, settings, componentOverrides)
+      void renderEmail(document, settings, componentOverrides, {
+        audienceSimulation: belongsToAudience ? 'member' : 'non-member',
+      })
         .then((generated) => { if (!canceled) setSimulatedResult(generated) })
         .catch((cause: unknown) => {
           if (!canceled) setSimulatedResult({ mjml: '', html: '', errors: [cause instanceof Error ? cause.message : 'Falha na simulação.'] })

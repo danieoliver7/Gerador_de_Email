@@ -127,9 +127,30 @@ describe('buildMjml', () => {
     expect(mjml).toContain('<mj-spacer height="18px" padding="0" />')
     expect(mjml).toContain('<mj-table padding="0" width="100%"')
   })
+
+  it('preserves a single original soft-break paragraph when the header is disabled', () => {
+    const document = documentWith({ type: 'paragraph', runs: [{ text: 'Assunto: Oferta\nPré-header: Detalhes\nCorpo' }] })
+    const mjml = buildMjml(document, { ...settings, header: { ...settings.header, enabled: false } })
+    expect(mjml.slice(mjml.indexOf('<mj-body')).match(/<mj-text /g)).toHaveLength(1)
+    expect(mjml).toContain('Assunto: Oferta<br />Pré-header: Detalhes<br />Corpo')
+  })
 })
 
 describe('renderEmail', () => {
+  it('preserves valid hyperlinks and font names that contain internal marker-like strings', async () => {
+    const href = 'https://example.org/__ATELIE_COMMENT_SLOT_0_0__'
+    const fontFamily = '__ATELIE_COMMENT_SLOT_1_0__'
+    const result = await renderEmail(documentWith(
+      { type: 'paragraph', runs: [{ text: 'Leia mais', href }] },
+      { type: 'component', runs: [], componentId: 'acessar', instanceId: 'acessar-1' },
+    ), { ...settings, fontFamily })
+    expect(result.errors).toEqual([])
+    expect(result.html).toContain(`href="${href}"`)
+    expect(result.html).toContain(`font-family:${fontFamily}`)
+    expect(result.html).toContain('<!-- BOTÃO 1 - INÍCIO -->')
+    expect(result.html).toContain(ACESSAR_HTML)
+  })
+
   it('exports a single full-width 100 px header with no white gutter at the default settings', async () => {
     const result = await renderEmail(documentWith({ type: 'paragraph', runs: [{ text: 'Olá' }] }), settings)
     expect(result.errors).toEqual([])
@@ -406,8 +427,8 @@ describe('renderEmail', () => {
     expect(result.html).not.toContain('__ATELIE_CONDITION_SLOT_')
     expect(result.html).not.toContain('##CLIENTES_VIP##')
     // Raw slots sit between complete table rows after MJML compilation.
-    expect(result.html.slice(start - 30, start)).toMatch(/<\/tr>\s*$/)
-    expect(result.html.slice(end + '{%/if%}'.length, end + '{%/if%}'.length + 50)).toMatch(/^\s*<tr>/)
+    expect(result.html.slice(0, start)).toMatch(/<\/tr>\s*<!-- PARTE 1 - FIM -->\s*$/)
+    expect(result.html.slice(end + '{%/if%}'.length)).toMatch(/^\s*<!-- PARTE FINAL - INÍCIO -->\s*<tr>/)
   })
 
   it('exports independent conditions for different and repeated audiences', async () => {

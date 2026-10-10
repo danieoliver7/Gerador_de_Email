@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "document": {
+    "blocks": [
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Assunto: "
+          },
+          {
+            "text": "Novidades para você — campanha de exemplo",
+            "bold": true
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Pré-header: "
+          },
+          {
+            "text": "Confira quatro oportunidades e os conteúdos de cada audiência.",
+            "italic": true
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Olá, cliente!"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Preparamos uma "
+          },
+          {
+            "text": "seleção de novidades",
+            "bold": true
+          },
+          {
+            "text": " para você. "
+          },
+          {
+            "text": "Leia também as informações gerais.",
+            "href": "https://example.org/informacoes"
+          }
+        ]
+      },
+      {
+        "type": "component",
+        "runs": [],
+        "componentId": "word-button",
+        "instanceId": "word-button-1",
+        "initial": {
+          "text": "CONHECER NOVIDADES",
+          "url": "https://example.org/novidades"
+        }
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Depois das novidades, confira os conteúdos disponíveis para cada perfil."
+          }
+        ]
+      },
+      {
+        "type": "condition-start",
+        "runs": [],
+        "audience": "BASE_ATIVO"
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Você possui acesso a "
+          },
+          {
+            "text": "conteúdos exclusivos",
+            "bold": true
+          },
+          {
+            "text": " para a audiência BASE_ATIVO."
+          }
+        ]
+      },
+      {
+        "type": "component",
+        "runs": [],
+        "componentId": "word-button",
+        "instanceId": "word-button-2",
+        "initial": {
+          "text": "ACESSAR CONTEÚDO EXCLUSIVO",
+          "url": "https://example.org/base-ativo"
+        }
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "A seleção exclusiva permanece disponível para consulta.",
+            "italic": true
+          }
+        ]
+      },
+      {
+        "type": "condition-end",
+        "runs": [],
+        "audience": "BASE_ATIVO"
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Conheça também nossas recomendações para acompanhar as próximas ações."
+          }
+        ]
+      },
+      {
+        "type": "condition-start",
+        "runs": [],
+        "audience": "CLIENTES_VIP"
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Clientes da audiência CLIENTES_VIP podem conferir os benefícios especiais."
+          }
+        ]
+      },
+      {
+        "type": "component",
+        "runs": [],
+        "componentId": "word-button",
+        "instanceId": "word-button-3",
+        "initial": {
+          "text": "VER BENEFÍCIOS VIP",
+          "url": "https://example.org/clientes-vip"
+        }
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Consulte as orientações antes de escolher seu benefício."
+          }
+        ]
+      },
+      {
+        "type": "condition-end",
+        "runs": [],
+        "audience": "CLIENTES_VIP"
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Para continuar, veja os próximos passos desta campanha de exemplo."
+          }
+        ]
+      },
+      {
+        "type": "component",
+        "runs": [],
+        "componentId": "word-button",
+        "instanceId": "word-button-4",
+        "initial": {
+          "text": "ABRIR PRÓXIMOS PASSOS",
+          "url": "https://example.org/proximos-passos"
+        }
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Obrigado por acompanhar nossas novidades!"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Até breve,"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "runs": [
+          {
+            "text": "Equipe Exemplo",
+            "bold": true
+          }
+        ]
+      }
+    ],
+    "warnings": [],
+    "sourceName": "organizacao-quatro-botoes.docx",
+    "errors": []
+  },
+  "componentOverrides": {},
+  "settings": {
+    "width": 600,
+    "fontFamily": "Arial, Helvetica, sans-serif",
+    "backgroundColor": "#f3f4f6",
+    "surfaceColor": "#ffffff",
+    "textColor": "#1f2937",
+    "accentColor": "#2563eb",
+    "template": "classic",
+    "header": {
+      "enabled": true,
+      "backgroundColor": "#000000",
+      "height": 100,
+      "marginTop": 0,
+      "marginBottom": 0
+    }
+  },
+  "savedAt": "2026-10-10T00:00:00.000Z"
+}
