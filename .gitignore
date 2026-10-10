@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+coverage/
+*.local
+.npm-cache/
+.tmp/
+*.tsbuildinfo
+Nova pasta/

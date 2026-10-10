@@ -1,0 +1,35 @@
+{
+  "name": "gerador-email-local",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run --pool=threads --maxWorkers=1 --no-file-parallelism",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "dompurify": "^3.4.16",
+    "lucide-react": "^1.53.0",
+    "mammoth": "^1.13.0",
+    "mjml-browser": "^5.4.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/mjml-browser": "^5.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^29.1.1",
+    "jszip": "^3.10.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}
